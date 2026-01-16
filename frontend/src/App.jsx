@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import ReactFlow, {
-  Background,
-  Controls,
-  ReactFlowProvider,
-} from "reactflow";
+import ReactFlow, { Background, Controls, ReactFlowProvider } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
 
@@ -64,23 +60,38 @@ function Flow() {
         });
         setSkillsMap(skillMap);
 
-        const rawNodes = data.map((skill) => ({
-          id: String(skill.skill_id),
-          data: { label: skill.name },
-          style: {
-            background:
-              skill.skill_state === "COMPLETED"
-                ? "#2e7d32"
-                : skill.skill_state === "AVAILABLE"
-                ? "#f9a825"
-                : "#c62828",
-            color: "#fff",
-            borderRadius: 8,
-            fontWeight: "bold",
-            padding: 10,
-            cursor: "pointer",
-          },
-        }));
+        const rawNodes = data.map((skill) => {
+          const isLocked = skill.skill_state === "LOCKED";
+
+          return {
+            id: String(skill.skill_id),
+            data: {
+              label: (
+                <div
+                  title={isLocked ? "Complete prerequisites first" : ""}
+                  style={{ pointerEvents: "auto" }}
+                >
+                  {skill.name}
+                </div>
+              ),
+            },
+            style: {
+              background:
+                skill.skill_state === "COMPLETED"
+                  ? "#2e7d32"
+                  : skill.skill_state === "AVAILABLE"
+                    ? "#f9a825"
+                    : "#9e9e9e",
+              color: "#fff",
+              borderRadius: 8,
+              fontWeight: "bold",
+              padding: 10,
+              cursor: isLocked ? "not-allowed" : "pointer",
+              opacity: isLocked ? 0.5 : 1,
+              filter: isLocked ? "blur(0.5px)" : "none",
+            },
+          };
+        });
 
         const rawEdges = data.slice(1).map((skill, index) => ({
           id: `e-${data[index].skill_id}-${skill.skill_id}`,
@@ -105,7 +116,13 @@ function Flow() {
           fitView
           onNodeClick={(_, node) => {
             const skill = skillsMap[node.id];
-            if (skill) setSelectedSkill(skill);
+            if (!skill) return;
+
+            if (skill.skill_state === "LOCKED") {
+              return;
+            }
+
+            setSelectedSkill(skill);
           }}
         >
           <Background />
