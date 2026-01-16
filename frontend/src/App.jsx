@@ -4,7 +4,48 @@ import ReactFlow, {
   Controls,
   ReactFlowProvider,
 } from "reactflow";
+import dagre from "dagre";
 import "reactflow/dist/style.css";
+
+const nodeWidth = 160;
+const nodeHeight = 60;
+
+const getLayoutedElements = (nodes, edges) => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  dagreGraph.setGraph({
+    rankdir: "TB", // Top → Bottom
+    nodesep: 40,
+    ranksep: 80,
+  });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, {
+      width: nodeWidth,
+      height: nodeHeight,
+    });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+};
 
 function Flow() {
   const [nodes, setNodes] = useState([]);
@@ -14,11 +55,8 @@ function Flow() {
     fetch("http://localhost:5000/roadmap/1")
       .then((res) => res.json())
       .then((data) => {
-        if (!Array.isArray(data)) return;
-
-        const flowNodes = data.map((skill, index) => ({
+        const rawNodes = data.map((skill) => ({
           id: String(skill.skill_id),
-          position: { x: index * 200, y: 100 },
           data: { label: skill.name },
           style: {
             background:
@@ -28,23 +66,24 @@ function Flow() {
                 ? "#f9a825"
                 : "#c62828",
             color: "#fff",
-            padding: 10,
             borderRadius: 8,
             fontWeight: "bold",
+            padding: 10,
           },
         }));
 
-        const flowEdges = data.slice(1).map((skill, index) => ({
+        const rawEdges = data.slice(1).map((skill, index) => ({
           id: `e-${data[index].skill_id}-${skill.skill_id}`,
           source: String(data[index].skill_id),
           target: String(skill.skill_id),
           animated: true,
         }));
 
-        setNodes(flowNodes);
-        setEdges(flowEdges);
-      })
-      .catch(console.error);
+        const layouted = getLayoutedElements(rawNodes, rawEdges);
+
+        setNodes(layouted.nodes);
+        setEdges(layouted.edges);
+      });
   }, []);
 
   return (
