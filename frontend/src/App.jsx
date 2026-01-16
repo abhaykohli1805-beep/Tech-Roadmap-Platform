@@ -55,7 +55,7 @@ function Flow() {
   const [selectedSkill, setSelectedSkill] = useState(null);
   const [skillDetails, setSkillDetails] = useState(null);
 
-  // Load roadmap (initial)
+  // Load roadmap
   const loadRoadmap = async () => {
     const res = await fetch("http://localhost:5000/roadmap/1");
     const data = await res.json();
@@ -122,7 +122,7 @@ function Flow() {
       .catch(console.error);
   }, [selectedSkill]);
 
-  // 🔥 UPDATED PROGRESS FUNCTION (NO RELOAD)
+  // Update progress (NO reload)
   const updateProgress = async (status) => {
     try {
       await fetch("http://localhost:5000/progress", {
@@ -136,11 +136,6 @@ function Flow() {
       });
 
       await loadRoadmap();
-
-      // Update selected skill state
-      setSelectedSkill((prev) =>
-        prev ? skillsMap[String(prev.skill_id)] : null
-      );
     } catch (err) {
       console.error("Progress update failed:", err);
     }
@@ -228,15 +223,66 @@ function Flow() {
                 <strong>Progress:</strong>
               </p>
 
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={() => updateProgress("IN_PROGRESS")}>
+              {/* FOGGY COMPLETED BUTTONS */}
+              <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                <button
+                  onClick={() => updateProgress("IN_PROGRESS")}
+                  style={{
+                    opacity:
+                      selectedSkill.skill_state === "COMPLETED" ? 0.6 : 1,
+                    cursor: "pointer",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #ccc",
+                    background:
+                      selectedSkill.skill_state === "COMPLETED"
+                        ? "#f2f2f2"
+                        : "#ffffff",
+                  }}
+                >
                   ▶ Start
                 </button>
 
-                <button onClick={() => updateProgress("COMPLETED")}>
-                  ✅ Mark Completed
+                <button
+                  onClick={() => updateProgress("COMPLETED")}
+                  style={{
+                    opacity:
+                      selectedSkill.skill_state === "COMPLETED" ? 0.6 : 1,
+                    cursor: "pointer",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #4caf50",
+                    background:
+                      selectedSkill.skill_state === "COMPLETED"
+                        ? "#e8f5e9"
+                        : "#4caf50",
+                    color:
+                      selectedSkill.skill_state === "COMPLETED"
+                        ? "#2e7d32"
+                        : "#ffffff",
+                  }}
+                >
+                  {selectedSkill.skill_state === "COMPLETED"
+                    ? "✔ Completed"
+                    : "✅ Mark Completed"}
                 </button>
               </div>
+
+              {selectedSkill.skill_state === "COMPLETED" && (
+                <p
+                  style={{
+                    marginTop: "10px",
+                    fontSize: "13px",
+                    color: "#555",
+                    background: "#f9f9f9",
+                    padding: "6px 8px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  You’ve already completed this skill. You can revisit it
+                  anytime.
+                </p>
+              )}
             </>
           )}
         </div>
