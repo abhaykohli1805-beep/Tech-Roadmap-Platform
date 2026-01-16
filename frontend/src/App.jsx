@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import ReactFlow, { Background, Controls, ReactFlowProvider } from "reactflow";
+import ReactFlow, {
+  Background,
+  Controls,
+  ReactFlowProvider,
+} from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
 
@@ -49,16 +53,16 @@ function Flow() {
   const [edges, setEdges] = useState([]);
   const [skillsMap, setSkillsMap] = useState({});
   const [selectedSkill, setSelectedSkill] = useState(null);
+  const [skillDetails, setSkillDetails] = useState(null);
 
+  // Load roadmap once
   useEffect(() => {
     fetch("http://localhost:5000/roadmap/1")
       .then((res) => res.json())
       .then((data) => {
-        const skillMap = {};
-        data.forEach((s) => {
-          skillMap[String(s.skill_id)] = s;
-        });
-        setSkillsMap(skillMap);
+        const map = {};
+        data.forEach((s) => (map[String(s.skill_id)] = s));
+        setSkillsMap(map);
 
         const rawNodes = data.map((skill) => {
           const isLocked = skill.skill_state === "LOCKED";
@@ -67,10 +71,7 @@ function Flow() {
             id: String(skill.skill_id),
             data: {
               label: (
-                <div
-                  title={isLocked ? "Complete prerequisites first" : ""}
-                  style={{ pointerEvents: "auto" }}
-                >
+                <div title={isLocked ? "Complete prerequisites first" : ""}>
                   {skill.name}
                 </div>
               ),
@@ -80,15 +81,14 @@ function Flow() {
                 skill.skill_state === "COMPLETED"
                   ? "#2e7d32"
                   : skill.skill_state === "AVAILABLE"
-                    ? "#f9a825"
-                    : "#9e9e9e",
+                  ? "#f9a825"
+                  : "#9e9e9e",
               color: "#fff",
               borderRadius: 8,
               fontWeight: "bold",
               padding: 10,
               cursor: isLocked ? "not-allowed" : "pointer",
               opacity: isLocked ? 0.5 : 1,
-              filter: isLocked ? "blur(0.5px)" : "none",
             },
           };
         });
@@ -106,22 +106,32 @@ function Flow() {
       });
   }, []);
 
+  // ✅ FETCH SKILL DETAILS WHEN SELECTION CHANGES
+  useEffect(() => {
+    if (!selectedSkill) {
+      setSkillDetails(null);
+      return;
+    }
+
+    fetch(`http://localhost:5000/skill/${selectedSkill.skill_id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setSkillDetails(data);
+      })
+      .catch(console.error);
+  }, [selectedSkill]);
+
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
       {/* FLOWCHART */}
-      <div style={{ flex: 1, height: "100vh" }}>
+      <div style={{ flex: 1 }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           fitView
           onNodeClick={(_, node) => {
             const skill = skillsMap[node.id];
-            if (!skill) return;
-
-            if (skill.skill_state === "LOCKED") {
-              return;
-            }
-
+            if (!skill || skill.skill_state === "LOCKED") return;
             setSelectedSkill(skill);
           }}
         >
@@ -138,36 +148,51 @@ function Flow() {
             padding: "20px",
             borderLeft: "1px solid #ddd",
             background: "#fafafa",
+            color: "#000",
           }}
         >
           <button
             onClick={() => setSelectedSkill(null)}
-            style={{ float: "right" }}
+            style={{
+              float: "right",
+              border: "none",
+              background: "transparent",
+              fontSize: "18px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
           >
             ✕
           </button>
 
-          <h2>{selectedSkill.name}</h2>
+          {!skillDetails && <p>Loading skill details...</p>}
 
-          <p>
-            <strong>Status:</strong> {selectedSkill.skill_state}
-          </p>
+          {skillDetails && (
+            <>
+              <h2>{skillDetails.name}</h2>
+              <p>
+                <strong>Status:</strong> {selectedSkill.skill_state}
+              </p>
+              <p>
+                <strong>Difficulty:</strong>{" "}
+                {skillDetails.difficulty_level}
+              </p>
+              <p>
+                <strong>Estimated time:</strong>{" "}
+                {skillDetails.estimated_time_hours} hours
+              </p>
+              <p>{skillDetails.description}</p>
 
-          <p>
-            <strong>Description:</strong>
-            <br />
-            Detailed explanation, notes, diagrams, and resources will appear
-            here.
-          </p>
-
-          <p>
-            <strong>Next actions:</strong>
-          </p>
-          <ul>
-            <li>📘 Start learning</li>
-            <li>✅ Mark as known</li>
-            <li>🧪 Take assessment</li>
-          </ul>
+              <p>
+                <strong>Prerequisites:</strong>
+              </p>
+              <ul>
+                {skillDetails.prerequisites.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       )}
     </div>
