@@ -55,58 +55,61 @@ function Flow() {
   const [selectedSkill, setSelectedSkill] = useState(null);
   const [skillDetails, setSkillDetails] = useState(null);
 
-  // Load roadmap once
+  // Load roadmap (initial)
+  const loadRoadmap = async () => {
+    const res = await fetch("http://localhost:5000/roadmap/1");
+    const data = await res.json();
+
+    const map = {};
+    data.forEach((s) => (map[String(s.skill_id)] = s));
+    setSkillsMap(map);
+
+    const rawNodes = data.map((skill) => {
+      const isLocked = skill.skill_state === "LOCKED";
+
+      return {
+        id: String(skill.skill_id),
+        data: {
+          label: (
+            <div title={isLocked ? "Complete prerequisites first" : ""}>
+              {skill.name}
+            </div>
+          ),
+        },
+        style: {
+          background:
+            skill.skill_state === "COMPLETED"
+              ? "#2e7d32"
+              : skill.skill_state === "AVAILABLE"
+              ? "#f9a825"
+              : "#9e9e9e",
+          color: "#fff",
+          borderRadius: 8,
+          fontWeight: "bold",
+          padding: 10,
+          cursor: isLocked ? "not-allowed" : "pointer",
+          opacity: isLocked ? 0.5 : 1,
+        },
+      };
+    });
+
+    const rawEdges = data.slice(1).map((skill, index) => ({
+      id: `e-${data[index].skill_id}-${skill.skill_id}`,
+      source: String(data[index].skill_id),
+      target: String(skill.skill_id),
+      animated: true,
+    }));
+
+    const layouted = getLayoutedElements(rawNodes, rawEdges);
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  };
+
   useEffect(() => {
-    fetch("http://localhost:5000/roadmap/1")
-      .then((res) => res.json())
-      .then((data) => {
-        const map = {};
-        data.forEach((s) => (map[String(s.skill_id)] = s));
-        setSkillsMap(map);
-
-        const rawNodes = data.map((skill) => {
-          const isLocked = skill.skill_state === "LOCKED";
-
-          return {
-            id: String(skill.skill_id),
-            data: {
-              label: (
-                <div title={isLocked ? "Complete prerequisites first" : ""}>
-                  {skill.name}
-                </div>
-              ),
-            },
-            style: {
-              background:
-                skill.skill_state === "COMPLETED"
-                  ? "#2e7d32"
-                  : skill.skill_state === "AVAILABLE"
-                  ? "#f9a825"
-                  : "#9e9e9e",
-              color: "#fff",
-              borderRadius: 8,
-              fontWeight: "bold",
-              padding: 10,
-              cursor: isLocked ? "not-allowed" : "pointer",
-              opacity: isLocked ? 0.5 : 1,
-            },
-          };
-        });
-
-        const rawEdges = data.slice(1).map((skill, index) => ({
-          id: `e-${data[index].skill_id}-${skill.skill_id}`,
-          source: String(data[index].skill_id),
-          target: String(skill.skill_id),
-          animated: true,
-        }));
-
-        const layouted = getLayoutedElements(rawNodes, rawEdges);
-        setNodes(layouted.nodes);
-        setEdges(layouted.edges);
-      });
+    loadRoadmap();
   }, []);
 
-  // ✅ FETCH SKILL DETAILS WHEN SELECTION CHANGES
+  // Fetch skill details
   useEffect(() => {
     if (!selectedSkill) {
       setSkillDetails(null);
@@ -115,11 +118,33 @@ function Flow() {
 
     fetch(`http://localhost:5000/skill/${selectedSkill.skill_id}`)
       .then((res) => res.json())
-      .then((data) => {
-        setSkillDetails(data);
-      })
+      .then((data) => setSkillDetails(data))
       .catch(console.error);
   }, [selectedSkill]);
+
+  // 🔥 UPDATED PROGRESS FUNCTION (NO RELOAD)
+  const updateProgress = async (status) => {
+    try {
+      await fetch("http://localhost:5000/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: 1,
+          skillId: selectedSkill.skill_id,
+          status,
+        }),
+      });
+
+      await loadRoadmap();
+
+      // Update selected skill state
+      setSelectedSkill((prev) =>
+        prev ? skillsMap[String(prev.skill_id)] : null
+      );
+    } catch (err) {
+      console.error("Progress update failed:", err);
+    }
+  };
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
@@ -170,27 +195,48 @@ function Flow() {
           {skillDetails && (
             <>
               <h2>{skillDetails.name}</h2>
+
               <p>
                 <strong>Status:</strong> {selectedSkill.skill_state}
               </p>
+
               <p>
                 <strong>Difficulty:</strong>{" "}
                 {skillDetails.difficulty_level}
               </p>
+
               <p>
                 <strong>Estimated time:</strong>{" "}
                 {skillDetails.estimated_time_hours} hours
               </p>
+
               <p>{skillDetails.description}</p>
 
               <p>
                 <strong>Prerequisites:</strong>
               </p>
+
               <ul>
                 {skillDetails.prerequisites.map((p) => (
                   <li key={p}>{p}</li>
                 ))}
               </ul>
+
+              <hr />
+
+              <p>
+                <strong>Progress:</strong>
+              </p>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button onClick={() => updateProgress("IN_PROGRESS")}>
+                  ▶ Start
+                </button>
+
+                <button onClick={() => updateProgress("COMPLETED")}>
+                  ✅ Mark Completed
+                </button>
+              </div>
             </>
           )}
         </div>
