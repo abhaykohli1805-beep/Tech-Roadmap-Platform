@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
-import ReactFlow, { Background, Controls } from "reactflow";
+import ReactFlow, {
+  Background,
+  Controls,
+  ReactFlowProvider,
+} from "reactflow";
 import "reactflow/dist/style.css";
 
-function App() {
+function Flow() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
@@ -10,9 +14,10 @@ function App() {
     fetch("http://localhost:5000/roadmap/1")
       .then((res) => res.json())
       .then((data) => {
-        // Create nodes
+        if (!Array.isArray(data)) return;
+
         const flowNodes = data.map((skill, index) => ({
-          id: skill.skill_id.toString(),
+          id: String(skill.skill_id),
           position: { x: index * 200, y: 100 },
           data: { label: skill.name },
           style: {
@@ -29,21 +34,21 @@ function App() {
           },
         }));
 
-        // Create edges (Python → NumPy)
         const flowEdges = data.slice(1).map((skill, index) => ({
-          id: `e${data[index].skill_id}-${skill.skill_id}`,
-          source: data[index].skill_id.toString(),
-          target: skill.skill_id.toString(),
+          id: `e-${data[index].skill_id}-${skill.skill_id}`,
+          source: String(data[index].skill_id),
+          target: String(skill.skill_id),
           animated: true,
         }));
 
         setNodes(flowNodes);
         setEdges(flowEdges);
-      });
+      })
+      .catch(console.error);
   }, []);
 
   return (
-    <div style={{ height: "100vh", width: "100%" }}>
+    <div style={{ height: "100vh", width: "100vw" }}>
       <ReactFlow nodes={nodes} edges={edges} fitView>
         <Background />
         <Controls />
@@ -52,5 +57,10 @@ function App() {
   );
 }
 
-export default App;
-
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <Flow />
+    </ReactFlowProvider>
+  );
+}
